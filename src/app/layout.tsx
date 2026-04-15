@@ -1,9 +1,6 @@
 import type { Metadata, Viewport } from 'next';
-import { Geist } from 'next/font/google';
 import './globals.css';
 import NavBar from '@/components/ui/NavBar';
-
-const geist = Geist({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
   title: 'MuscleTrack',
@@ -30,7 +27,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <head>
         <link rel="apple-touch-icon" href="/icons/icon-192.png" />
       </head>
-      <body className={`${geist.className} bg-black text-white antialiased`}>
+      <body className="bg-black text-white antialiased" style={{ fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" }}>
         <main className="pb-20">{children}</main>
         <NavBar />
       </body>
