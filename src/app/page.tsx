@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Dumbbell, Clock, ChevronRight, Zap, Plus } from 'lucide-react';
 import { db, type Workout, type Template } from '@/lib/db';
-import { seedExercises } from '@/lib/db';
+import { seedExercises, reseedExercises } from '@/lib/db';
 import { formatDate, sessionDuration } from '@/lib/calculations';
 
 interface WorkoutSummary extends Workout {
@@ -19,7 +19,16 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    seedExercises();
+    async function init() {
+      // Reseed si les exercices n'ont pas encore les descriptions (migration v2)
+      const first = await db.exercises.toCollection().first();
+      if (!first || !first.description) {
+        await reseedExercises();
+      } else {
+        await seedExercises();
+      }
+      await load();
+    }
 
     async function load() {
       const [workouts, allSets, tmpl] = await Promise.all([
@@ -42,7 +51,7 @@ export default function DashboardPage() {
       setLoading(false);
     }
 
-    load();
+    init();
   }, []);
 
   if (loading) {

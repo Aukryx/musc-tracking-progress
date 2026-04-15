@@ -1,8 +1,9 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Search, X, Plus } from 'lucide-react';
+import { Search, X, Plus, Info } from 'lucide-react';
 import { db, type Exercise } from '@/lib/db';
+import ExerciseDetailSheet from './ExerciseDetailSheet';
 
 interface ExercisePickerProps {
   onSelect: (name: string) => void;
@@ -13,6 +14,7 @@ export default function ExercisePicker({ onSelect, onClose }: ExercisePickerProp
   const [exercises, setExercises] = useState<Exercise[]>([]);
   const [query, setQuery] = useState('');
   const [customName, setCustomName] = useState('');
+  const [detail, setDetail] = useState<Exercise | null>(null);
 
   useEffect(() => {
     db.exercises.orderBy('name').toArray().then(setExercises);
@@ -29,6 +31,19 @@ export default function ExercisePicker({ onSelect, onClose }: ExercisePickerProp
     return acc;
   }, {});
 
+  if (detail) {
+    return (
+      <ExerciseDetailSheet
+        exercise={detail}
+        onClose={() => setDetail(null)}
+        onSelect={() => {
+          onSelect(detail.name);
+          setDetail(null);
+        }}
+      />
+    );
+  }
+
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-black">
       {/* Header */}
@@ -40,7 +55,7 @@ export default function ExercisePicker({ onSelect, onClose }: ExercisePickerProp
       </div>
 
       {/* Search */}
-      <div className="p-4">
+      <div className="p-4 pb-2">
         <div className="relative">
           <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
           <input
@@ -61,15 +76,11 @@ export default function ExercisePicker({ onSelect, onClose }: ExercisePickerProp
             type="text"
             value={customName}
             onChange={(e) => setCustomName(e.target.value)}
-            placeholder="Nom personnalisé..."
-            className="flex-1 bg-zinc-900 border border-zinc-700 rounded-xl px-4 py-3 text-white placeholder-zinc-500 focus:outline-none focus:border-green-500 text-base"
+            placeholder="Exercice personnalisé..."
+            className="flex-1 bg-zinc-900 border border-zinc-700 rounded-xl px-4 py-3 text-white placeholder-zinc-600 focus:outline-none focus:border-green-500 text-base"
           />
           <button
-            onClick={() => {
-              if (customName.trim()) {
-                onSelect(customName.trim());
-              }
-            }}
+            onClick={() => { if (customName.trim()) onSelect(customName.trim()); }}
             disabled={!customName.trim()}
             className="bg-green-600 disabled:bg-zinc-700 disabled:text-zinc-500 text-white px-4 rounded-xl font-bold transition-colors"
           >
@@ -88,14 +99,36 @@ export default function ExercisePicker({ onSelect, onClose }: ExercisePickerProp
               </span>
             </div>
             {exs.map((ex) => (
-              <button
+              <div
                 key={ex.id}
-                onClick={() => onSelect(ex.name)}
-                className="w-full text-left px-4 py-4 border-b border-zinc-900 hover:bg-zinc-900 active:bg-zinc-800 transition-colors"
+                className="flex items-center border-b border-zinc-900"
               >
-                <div className="text-white font-medium">{ex.name}</div>
-                <div className="text-xs text-zinc-500 mt-0.5">{ex.category}</div>
-              </button>
+                {/* Sélection */}
+                <button
+                  onClick={() => onSelect(ex.name)}
+                  className="flex-1 text-left px-4 py-4 hover:bg-zinc-900 active:bg-zinc-800 transition-colors"
+                >
+                  <div className="text-white font-medium">{ex.name}</div>
+                  <div className="text-xs text-zinc-500 mt-0.5">
+                    {ex.category}
+                    {ex.primaryMuscles?.length > 0 && (
+                      <span className="ml-2 text-zinc-600">
+                        · {ex.primaryMuscles.slice(0, 2).join(', ')}
+                      </span>
+                    )}
+                  </div>
+                </button>
+
+                {/* Bouton fiche détail */}
+                {(ex.description || ex.primaryMuscles?.length > 0) && (
+                  <button
+                    onClick={() => setDetail(ex)}
+                    className="px-4 py-4 text-zinc-600 hover:text-blue-400 transition-colors"
+                  >
+                    <Info size={18} />
+                  </button>
+                )}
+              </div>
             ))}
           </div>
         ))}

@@ -1,10 +1,12 @@
 'use client';
 
 import { useState } from 'react';
-import { Plus, ChevronDown, ChevronUp, Trash2 } from 'lucide-react';
+import { Plus, ChevronDown, ChevronUp, Trash2, Info } from 'lucide-react';
 import SetRow from './SetRow';
+import ExerciseDetailSheet from '@/components/ui/ExerciseDetailSheet';
 import type { ActiveExercise, ActiveSet } from '@/lib/workout-store';
 import { generateId } from '@/lib/workout-store';
+import { db, type Exercise } from '@/lib/db';
 
 interface PreviousBest {
   weight: number;
@@ -28,6 +30,12 @@ export default function ExerciseCard({
   onSetCompleted,
 }: ExerciseCardProps) {
   const [collapsed, setCollapsed] = useState(false);
+  const [detailExercise, setDetailExercise] = useState<Exercise | null>(null);
+
+  async function openDetail() {
+    const ex = await db.exercises.where('name').equals(exercise.name).first();
+    if (ex) setDetailExercise(ex);
+  }
 
   const best = previousBests[exercise.name] ?? null;
   const completedCount = exercise.sets.filter((s) => s.completed).length;
@@ -84,12 +92,25 @@ export default function ExerciseCard({
         </button>
 
         <button
+          onClick={openDetail}
+          className="text-zinc-600 hover:text-blue-400 p-1 transition-colors"
+        >
+          <Info size={16} />
+        </button>
+        <button
           onClick={onDelete}
           className="text-zinc-600 hover:text-red-500 p-1 transition-colors"
         >
           <Trash2 size={16} />
         </button>
       </div>
+
+      {detailExercise && (
+        <ExerciseDetailSheet
+          exercise={detailExercise}
+          onClose={() => setDetailExercise(null)}
+        />
+      )}
 
       {!collapsed && (
         <div className="p-3 space-y-2">
