@@ -3,8 +3,8 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Dumbbell, Clock, ChevronRight, Zap, Plus } from 'lucide-react';
-import { db, type Workout, type Template } from '@/lib/db';
-import { seedExercises, reseedExercises } from '@/lib/db';
+import { db, type Workout, type Template, needsExerciseDBSeed, markExerciseDBSeeded } from '@/lib/db';
+import { seedFromExerciseDB } from '@/lib/exercisedb';
 import { formatDate, sessionDuration } from '@/lib/calculations';
 
 interface WorkoutSummary extends Workout {
@@ -17,15 +17,18 @@ export default function DashboardPage() {
   const [templates, setTemplates] = useState<Template[]>([]);
   const [stats, setStats] = useState({ totalWorkouts: 0, totalSets: 0 });
   const [loading, setLoading] = useState(true);
+  const [syncing, setSyncing] = useState(false);
+  const [syncProgress, setSyncProgress] = useState({ loaded: 0, total: 873 });
 
   useEffect(() => {
     async function init() {
-      // Reseed si les exercices n'ont pas encore les descriptions (migration v2)
-      const first = await db.exercises.toCollection().first();
-      if (!first || !first.description) {
-        await reseedExercises();
-      } else {
-        await seedExercises();
+      if (needsExerciseDBSeed()) {
+        setSyncing(true);
+        await seedFromExerciseDB((loaded, total) =>
+          setSyncProgress({ loaded, total })
+        );
+        markExerciseDBSeeded();
+        setSyncing(false);
       }
       await load();
     }
@@ -53,6 +56,25 @@ export default function DashboardPage() {
 
     init();
   }, []);
+
+  if (syncing) {
+    const pct = Math.round((syncProgress.loaded / syncProgress.total) * 100);
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-black px-8 gap-6">
+        <div className="text-center">
+          <h2 className="text-white font-bold text-lg mb-1">Syncing exercise library</h2>
+          <p className="text-zinc-500 text-sm">Loading {syncProgress.loaded} / {syncProgress.total} exercises…</p>
+        </div>
+        <div className="w-full max-w-xs bg-zinc-900 rounded-full h-2">
+          <div
+            className="bg-blue-500 h-2 rounded-full transition-all duration-300"
+            style={{ width: `${pct}%` }}
+          />
+        </div>
+        <p className="text-zinc-600 text-xs">First launch only — data is cached locally</p>
+      </div>
+    );
+  }
 
   if (loading) {
     return (

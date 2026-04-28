@@ -1,16 +1,50 @@
 import type { MuscleKey } from '@/lib/db';
 
 interface MuscleMapProps {
-  primary: MuscleKey[];
-  secondary: MuscleKey[];
+  primary: string[];
+  secondary: string[];
   size?: number;
 }
 
-// Couleurs
-const PRIMARY = '#3b82f6';    // bleu vif
-const SECONDARY = '#1d4ed8';  // bleu foncé
-const BASE = '#27272a';       // zinc-800
-const OUTLINE = '#3f3f46';    // zinc-700
+const PRIMARY = '#3b82f6';
+const SECONDARY = '#1d4ed8';
+const BASE = '#27272a';
+const OUTLINE = '#3f3f46';
+
+const API_TO_KEY: Record<string, MuscleKey> = {
+  chest: 'pectoraux',
+  pectorals: 'pectoraux',
+  'serratus anterior': 'pectoraux',
+  lats: 'grand_dorsal',
+  'middle back': 'rhomboides',
+  rhomboids: 'rhomboides',
+  'lower back': 'lombaires',
+  'upper back': 'trapeze',
+  spine: 'lombaires',
+  traps: 'trapeze',
+  shoulders: 'deltoide_ant',
+  delts: 'deltoide_lat',
+  'anterior deltoid': 'deltoide_ant',
+  'posterior deltoid': 'deltoide_post',
+  biceps: 'biceps',
+  triceps: 'triceps',
+  forearms: 'avant_bras',
+  quadriceps: 'quadriceps',
+  quads: 'quadriceps',
+  hamstrings: 'ischio',
+  glutes: 'fessiers',
+  calves: 'mollets',
+  abdominals: 'abdominaux',
+  abs: 'abdominaux',
+  'hip flexors': 'abdominaux',
+};
+
+function resolveKeys(muscles: string[]): MuscleKey[] {
+  return muscles.flatMap((m) => {
+    const key = API_TO_KEY[m.toLowerCase()];
+    return key ? [key] : [];
+  });
+}
 
 function color(key: MuscleKey, primary: MuscleKey[], secondary: MuscleKey[]) {
   if (primary.includes(key)) return PRIMARY;
@@ -19,7 +53,9 @@ function color(key: MuscleKey, primary: MuscleKey[], secondary: MuscleKey[]) {
 }
 
 export default function MuscleMap({ primary, secondary, size = 280 }: MuscleMapProps) {
-  const c = (key: MuscleKey) => color(key, primary, secondary);
+  const primaryKeys = resolveKeys(primary);
+  const secondaryKeys = resolveKeys(secondary);
+  const c = (key: MuscleKey) => color(key, primaryKeys, secondaryKeys);
   const h = size;
   const w = size * 0.85;
 

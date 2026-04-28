@@ -2,14 +2,14 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Home, Dumbbell, History, BarChart3, Layout } from 'lucide-react';
+import { Home, Dumbbell, History, BarChart3, Salad } from 'lucide-react';
 
 const links = [
   { href: '/', label: 'Accueil', icon: Home },
   { href: '/workout', label: 'Séance', icon: Dumbbell },
   { href: '/history', label: 'Historique', icon: History },
   { href: '/analytics', label: 'Stats', icon: BarChart3 },
-  { href: '/templates', label: 'Templates', icon: Layout },
+  { href: '/nutrition', label: 'Nutrition', icon: Salad },
 ];
 
 export default function NavBar() {

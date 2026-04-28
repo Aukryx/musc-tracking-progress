@@ -45,3 +45,8 @@ next-env.d.ts
 /public/workbox-*.js
 /public/worker-*.js
 /public/sw.js.map
+
+# Fichiers locaux à ne pas committer
+*.png
+*.html
+!public/**
