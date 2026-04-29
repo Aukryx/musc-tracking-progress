@@ -9,18 +9,13 @@ import RestTimer from '@/components/ui/RestTimer';
 import {
   type ActiveWorkout,
   type ActiveExercise,
+  type PreviousBest,
   generateId,
   saveActiveWorkout,
   clearActiveWorkout,
 } from '@/lib/workout-store';
 import { db, type WorkoutSet } from '@/lib/db';
 import { sessionDuration, formatDuration } from '@/lib/calculations';
-
-interface PreviousBest {
-  weight: number;
-  reps: number;
-  oneRepMax: number;
-}
 
 interface WorkoutSessionProps {
   initial: ActiveWorkout;
@@ -31,7 +26,7 @@ export default function WorkoutSession({ initial }: WorkoutSessionProps) {
   const [workout, setWorkout] = useState<ActiveWorkout>(initial);
   const [showPicker, setShowPicker] = useState(false);
   const [showTimer, setShowTimer] = useState(false);
-  const [elapsed, setElapsed] = useState(0);
+  const [elapsed, setElapsed] = useState(() => sessionDuration(initial.startedAt));
   const [previousBests, setPreviousBests] = useState<Record<string, PreviousBest>>({});
   const [saving, setSaving] = useState(false);
 
@@ -40,7 +35,6 @@ export default function WorkoutSession({ initial }: WorkoutSessionProps) {
     const interval = setInterval(() => {
       setElapsed(sessionDuration(workout.startedAt));
     }, 10000);
-    setElapsed(sessionDuration(workout.startedAt));
     return () => clearInterval(interval);
   }, [workout.startedAt]);
 
@@ -120,14 +114,15 @@ export default function WorkoutSession({ initial }: WorkoutSessionProps) {
       const finishedAt = new Date();
 
       // Créer ou récupérer le workout en DB
-      let workoutId: number = workout.workoutId ?? 0;
-      if (!workout.workoutId) {
+      let workoutId: number;
+      if (workout.workoutId === null) {
         workoutId = await db.workouts.add({
           name: workout.name,
           startedAt: workout.startedAt,
           finishedAt,
         });
       } else {
+        workoutId = workout.workoutId;
         await db.workouts.update(workoutId, { finishedAt });
       }
 
@@ -140,11 +135,11 @@ export default function WorkoutSession({ initial }: WorkoutSessionProps) {
               workoutId,
               exerciseName: exercise.name,
               exerciseOrder: exercise.order,
-              setIndex: exercise.sets.filter((s) => s.completed).indexOf(set),
+              setIndex: exercise.sets.indexOf(set),
               weight: parseFloat(set.weight),
               reps: parseInt(set.reps),
               oneRepMax: set.oneRepMax,
-              completedAt: finishedAt,
+              completedAt: set.completedAt ?? finishedAt,
             });
           }
         }
@@ -175,7 +170,7 @@ export default function WorkoutSession({ initial }: WorkoutSessionProps) {
             <div className="flex items-center gap-3 text-xs text-zinc-500 mt-0.5">
               <span className="flex items-center gap-1">
                 <Clock size={11} />
-                {formatDuration(elapsed * 60)}
+                {formatDuration(elapsed)}
               </span>
               <span className="flex items-center gap-1">
                 <Dumbbell size={11} />
@@ -206,7 +201,7 @@ export default function WorkoutSession({ initial }: WorkoutSessionProps) {
       </div>
 
       {/* Exercises */}
-      <div className="px-4 py-4 space-y-4 pb-32">
+      <div className="px-4 py-4 space-y-4 pb-44">
         {workout.exercises.length === 0 && (
           <div className="flex flex-col items-center justify-center py-20 text-zinc-600">
             <Dumbbell size={48} className="mb-4 opacity-30" />
@@ -228,7 +223,7 @@ export default function WorkoutSession({ initial }: WorkoutSessionProps) {
       </div>
 
       {/* FAB Ajouter exercice */}
-      <div className="fixed bottom-6 left-0 right-0 flex justify-center px-4 z-20">
+      <div className="fixed bottom-20 left-0 right-0 flex justify-center px-4 z-20">
         <button
           onClick={() => setShowPicker(true)}
           className="flex items-center gap-3 bg-blue-600 hover:bg-blue-500 active:scale-95 text-white px-8 py-4 rounded-2xl font-bold text-base shadow-2xl shadow-blue-900/50 transition-all touch-manipulation"

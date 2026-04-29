@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
+import Image from 'next/image';
 import { Search, X, Plus, Info } from 'lucide-react';
 import { db, type Exercise } from '@/lib/db';
 import ExerciseDetailSheet from './ExerciseDetailSheet';
@@ -165,11 +166,12 @@ export default function ExercisePicker({ onSelect, onClose }: ExercisePickerProp
                 {/* GIF thumbnail */}
                 {ex.gifUrl && (
                   <div className="pl-3 py-2 shrink-0">
-                    <img
+                    <Image
                       src={ex.gifUrl}
                       alt=""
-                      className="w-12 h-12 rounded-lg object-cover bg-zinc-900"
-                      loading="lazy"
+                      width={48}
+                      height={48}
+                      className="rounded-lg object-cover bg-zinc-900"
                     />
                   </div>
                 )}

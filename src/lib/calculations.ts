@@ -61,5 +61,5 @@ export function formatDateShort(date: Date): string {
  */
 export function sessionDuration(start: Date, end?: Date): number {
   const endTime = end ?? new Date();
-  return Math.round((endTime.getTime() - start.getTime()) / 60000);
+  return Math.round((endTime.getTime() - start.getTime()) / 1000);
 }

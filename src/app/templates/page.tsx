@@ -1,10 +1,11 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Plus, Trash2, Dumbbell, ChevronRight } from 'lucide-react';
+import { Plus, Trash2, Dumbbell, ChevronRight, ChevronDown, ChevronUp, Search } from 'lucide-react';
 import Link from 'next/link';
 import { db, type Template } from '@/lib/db';
 import { generateId } from '@/lib/workout-store';
+import ExercisePicker from '@/components/ui/ExercisePicker';
 
 type TemplateExerciseInput = { id: string; name: string; sets: number };
 
@@ -12,13 +13,15 @@ export default function TemplatesPage() {
   const [templates, setTemplates] = useState<Template[]>([]);
   const [creating, setCreating] = useState(false);
   const [name, setName] = useState('');
-  const [exercises, setExercises] = useState<TemplateExerciseInput[]>([
+  const [exercises, setExercises] = useState<TemplateExerciseInput[]>(() => [
     { id: generateId(), name: '', sets: 3 },
   ]);
   const [loading, setLoading] = useState(true);
+  const [pickingFor, setPickingFor] = useState<string | null>(null);
 
   useEffect(() => {
-    db.templates.orderBy('lastUsedAt').reverse().toArray().then((t) => {
+    db.templates.toArray().then((t) => {
+      t.sort((a, b) => (b.lastUsedAt?.getTime() ?? 0) - (a.lastUsedAt?.getTime() ?? 0));
       setTemplates(t);
       setLoading(false);
     });
@@ -52,19 +55,34 @@ export default function TemplatesPage() {
       createdAt: new Date(),
     };
 
-    const id = await db.templates.add(newTemplate);
-    const created = await db.templates.get(id);
-    if (created) setTemplates((prev) => [created, ...prev]);
-
-    setCreating(false);
-    setName('');
-    setExercises([{ id: generateId(), name: '', sets: 3 }]);
+    try {
+      const id = await db.templates.add(newTemplate);
+      const created = await db.templates.get(id);
+      if (created) setTemplates((prev) => [created, ...prev]);
+      setCreating(false);
+      setName('');
+      setExercises([{ id: generateId(), name: '', sets: 3 }]);
+    } catch (err) {
+      console.error('Erreur lors de la création du template:', err);
+    }
   }
 
   async function deleteTemplate(id: number) {
     if (!confirm('Supprimer ce template ?')) return;
     await db.templates.delete(id);
     setTemplates((prev) => prev.filter((t) => t.id !== id));
+  }
+
+  if (pickingFor) {
+    return (
+      <ExercisePicker
+        onSelect={(exName) => {
+          updateExercise(pickingFor, 'name', exName);
+          setPickingFor(null);
+        }}
+        onClose={() => setPickingFor(null)}
+      />
+    );
   }
 
   if (loading) {
@@ -110,28 +128,40 @@ export default function TemplatesPage() {
             </span>
             {exercises.map((ex, i) => (
               <div key={ex.id} className="flex items-center gap-2">
-                <span className="text-zinc-600 text-sm w-4 text-center">{i + 1}</span>
-                <input
-                  type="text"
-                  value={ex.name}
-                  onChange={(e) => updateExercise(ex.id, 'name', e.target.value)}
-                  placeholder="Nom de l'exercice"
-                  className="flex-1 bg-zinc-900 border border-zinc-700 rounded-xl px-3 py-2.5 text-white placeholder-zinc-600 focus:outline-none focus:border-blue-500 text-sm"
-                />
-                <div className="flex items-center gap-1 bg-zinc-900 border border-zinc-700 rounded-xl px-2 py-2.5">
-                  <input
-                    type="number"
-                    inputMode="numeric"
-                    value={ex.sets}
-                    onChange={(e) => updateExercise(ex.id, 'sets', parseInt(e.target.value) || 1)}
-                    className="w-8 bg-transparent text-white text-center text-sm focus:outline-none"
-                  />
-                  <span className="text-zinc-500 text-xs">séries</span>
+                <span className="text-zinc-600 text-sm w-5 text-center shrink-0">{i + 1}</span>
+
+                <button
+                  onClick={() => setPickingFor(ex.id)}
+                  className={`flex-1 flex items-center gap-2 text-left px-3 py-2.5 rounded-xl border text-sm transition-colors ${
+                    ex.name
+                      ? 'bg-zinc-900 border-zinc-700 text-white'
+                      : 'bg-zinc-900 border-zinc-700 border-dashed text-zinc-500'
+                  }`}
+                >
+                  <Search size={13} className="shrink-0 text-zinc-500" />
+                  <span className="truncate">{ex.name || 'Choisir un exercice…'}</span>
+                </button>
+
+                <div className="flex items-center bg-zinc-900 border border-zinc-700 rounded-xl overflow-hidden shrink-0">
+                  <button
+                    onClick={() => updateExercise(ex.id, 'sets', Math.max(1, ex.sets - 1))}
+                    className="px-2 py-2.5 text-zinc-400 hover:text-white active:bg-zinc-800"
+                  >
+                    <ChevronDown size={14} />
+                  </button>
+                  <span className="text-white text-sm w-6 text-center">{ex.sets}</span>
+                  <button
+                    onClick={() => updateExercise(ex.id, 'sets', ex.sets + 1)}
+                    className="px-2 py-2.5 text-zinc-400 hover:text-white active:bg-zinc-800"
+                  >
+                    <ChevronUp size={14} />
+                  </button>
                 </div>
+
                 {exercises.length > 1 && (
                   <button
                     onClick={() => removeExercise(ex.id)}
-                    className="text-zinc-600 hover:text-red-500 p-1"
+                    className="text-zinc-600 hover:text-red-500 p-1 shrink-0 transition-colors"
                   >
                     <Trash2 size={14} />
                   </button>

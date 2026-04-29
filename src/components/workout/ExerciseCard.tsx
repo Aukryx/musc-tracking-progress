@@ -4,15 +4,9 @@ import { useState } from 'react';
 import { Plus, ChevronDown, ChevronUp, Trash2, Info } from 'lucide-react';
 import SetRow from './SetRow';
 import ExerciseDetailSheet from '@/components/ui/ExerciseDetailSheet';
-import type { ActiveExercise, ActiveSet } from '@/lib/workout-store';
+import type { ActiveExercise, ActiveSet, PreviousBest } from '@/lib/workout-store';
 import { generateId } from '@/lib/workout-store';
 import { db, type Exercise } from '@/lib/db';
-
-interface PreviousBest {
-  weight: number;
-  reps: number;
-  oneRepMax: number;
-}
 
 interface ExerciseCardProps {
   exercise: ActiveExercise;

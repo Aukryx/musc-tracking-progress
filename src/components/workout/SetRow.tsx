@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Check, Trash2 } from 'lucide-react';
 import { calculate1RM, format1RM } from '@/lib/calculations';
 import type { ActiveSet } from '@/lib/workout-store';
@@ -25,6 +25,8 @@ export default function SetRow({
   const [justCompleted, setJustCompleted] = useState(false);
   const weightRef = useRef<HTMLInputElement>(null);
   const repsRef = useRef<HTMLInputElement>(null);
+  const mountedRef = useRef(true);
+  useEffect(() => () => { mountedRef.current = false; }, []);
 
   const weight = parseFloat(set.weight) || 0;
   const reps = parseInt(set.reps) || 0;
@@ -37,8 +39,8 @@ export default function SetRow({
       if (typeof navigator !== 'undefined' && navigator.vibrate) {
         navigator.vibrate(80);
       }
-      setTimeout(() => setJustCompleted(false), 1500);
-      onChange({ oneRepMax: currentOneRM });
+      setTimeout(() => { if (mountedRef.current) setJustCompleted(false); }, 1500);
+      onChange({ oneRepMax: currentOneRM, completedAt: new Date() });
       onComplete();
     }
   }

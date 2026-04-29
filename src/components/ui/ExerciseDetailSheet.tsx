@@ -1,6 +1,7 @@
 'use client';
 
 import { X } from 'lucide-react';
+import Image from 'next/image';
 import MuscleMap, { MuscleLegend } from './MuscleMap';
 import type { Exercise } from '@/lib/db';
 
@@ -48,11 +49,12 @@ export default function ExerciseDetailSheet({ exercise, onClose, onSelect }: Exe
         {/* GIF */}
         {exercise.gifUrl && (
           <div className="flex justify-center items-center bg-zinc-900 py-6 px-4">
-            <img
+            <Image
               src={exercise.gifUrl}
               alt={exercise.name}
+              width={208}
+              height={208}
               className="h-52 rounded-2xl object-contain"
-              loading="lazy"
             />
           </div>
         )}
@@ -91,7 +93,7 @@ export default function ExerciseDetailSheet({ exercise, onClose, onSelect }: Exe
         )}
 
         {/* Instructions */}
-        {(exercise.instructions ?? exercise.tips)?.length > 0 && (
+        {(exercise.instructions?.length ?? 0) > 0 && (
           <>
             <div className="h-px bg-zinc-900 mx-4" />
             <div className="px-4 py-5">
@@ -99,7 +101,7 @@ export default function ExerciseDetailSheet({ exercise, onClose, onSelect }: Exe
                 Instructions
               </p>
               <ol className="space-y-3">
-                {(exercise.instructions ?? exercise.tips).map((step, i) => (
+                {(exercise.instructions ?? []).map((step, i) => (
                   <li key={i} className="flex items-start gap-3">
                     <span className="text-xs text-blue-400 font-bold bg-blue-600/20 rounded-full w-5 h-5 flex items-center justify-center shrink-0 mt-0.5">
                       {i + 1}

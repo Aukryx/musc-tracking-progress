@@ -18,13 +18,18 @@ export default function HistoryPage() {
   useEffect(() => {
     async function load() {
       const ws = await db.workouts.orderBy('startedAt').reverse().toArray();
-      const summaries = await Promise.all(
-        ws.map(async (w) => {
-          const sets = await db.workoutSets.where('workoutId').equals(w.id!).toArray();
-          const names = [...new Set(sets.map((s) => s.exerciseName))];
-          return { ...w, exerciseCount: names.length, setCount: sets.length };
-        })
-      );
+      const allSets = await db.workoutSets.toArray();
+      const setsByWorkout = new Map<number, typeof allSets>();
+      for (const set of allSets) {
+        const list = setsByWorkout.get(set.workoutId) ?? [];
+        list.push(set);
+        setsByWorkout.set(set.workoutId, list);
+      }
+      const summaries = ws.map((w) => {
+        const sets = setsByWorkout.get(w.id!) ?? [];
+        const names = [...new Set(sets.map((s) => s.exerciseName))];
+        return { ...w, exerciseCount: names.length, setCount: sets.length };
+      });
       setWorkouts(summaries);
       setLoading(false);
     }
@@ -90,7 +95,7 @@ export default function HistoryPage() {
                   {w.finishedAt && (
                     <>
                       <span>·</span>
-                      <span>{sessionDuration(w.startedAt, w.finishedAt)} min</span>
+                      <span>{Math.round(sessionDuration(w.startedAt, w.finishedAt) / 60)} min</span>
                     </>
                   )}
                 </div>

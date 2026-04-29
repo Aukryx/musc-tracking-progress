@@ -1,14 +1,10 @@
-/**
- * Store de séance en cours — conservé en mémoire/sessionStorage
- * pour survivre aux re-renders sans persister en IndexedDB avant la fin.
- */
-
 export interface ActiveSet {
-  id: string; // uuid temporaire
+  id: string;
   weight: string;
   reps: string;
   completed: boolean;
   oneRepMax: number;
+  completedAt?: Date;
 }
 
 export interface ActiveExercise {
@@ -25,6 +21,12 @@ export interface ActiveWorkout {
   exercises: ActiveExercise[];
 }
 
+export interface PreviousBest {
+  weight: number;
+  reps: number;
+  oneRepMax: number;
+}
+
 const STORAGE_KEY = 'active_workout';
 
 export function saveActiveWorkout(workout: ActiveWorkout) {
@@ -37,6 +39,11 @@ export function loadActiveWorkout(): ActiveWorkout | null {
     if (!raw) return null;
     const parsed = JSON.parse(raw);
     parsed.startedAt = new Date(parsed.startedAt);
+    for (const ex of parsed.exercises ?? []) {
+      for (const set of ex.sets ?? []) {
+        if (set.completedAt) set.completedAt = new Date(set.completedAt);
+      }
+    }
     return parsed;
   } catch {
     return null;
@@ -48,5 +55,5 @@ export function clearActiveWorkout() {
 }
 
 export function generateId(): string {
-  return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  return crypto.randomUUID();
 }

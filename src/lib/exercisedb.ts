@@ -80,17 +80,26 @@ function mapRawToExercise(raw: RawExercise): Omit<Exercise, 'id'> {
     muscleGroup: mapMuscleGroup(raw.primaryMuscles),
     primaryMuscles: raw.primaryMuscles,
     secondaryMuscles: raw.secondaryMuscles,
-    description: raw.instructions.join(' '),
-    tips: raw.instructions,
     instructions: raw.instructions,
     equipments: raw.equipment ? [raw.equipment] : [],
-    gifUrl: undefined,
   };
 }
+
+let _seeding = false;
 
 export async function seedFromExerciseDB(
   onProgress?: (loaded: number, total: number) => void,
 ): Promise<void> {
+  if (_seeding) return;
+  _seeding = true;
+  try {
+    await _seed(onProgress);
+  } finally {
+    _seeding = false;
+  }
+}
+
+async function _seed(onProgress?: (loaded: number, total: number) => void): Promise<void> {
   const res = await fetch('/exercises.json');
   if (!res.ok) throw new Error('Failed to load exercises.json');
 

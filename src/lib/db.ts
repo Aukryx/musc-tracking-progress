@@ -14,11 +14,9 @@ export interface Exercise {
   muscleGroup: string;
   primaryMuscles: string[];
   secondaryMuscles: string[];
-  description: string;
-  tips: string[];
-  gifUrl?: string;
   instructions?: string[];
   equipments?: string[];
+  gifUrl?: string;
 }
 
 export interface WorkoutSet {
@@ -89,7 +87,6 @@ class MuscloDB extends Dexie {
       exercises: '++id, name, category, muscleGroup',
     }).upgrade(async (trans) => {
       await trans.table('exercises').toCollection().modify((ex) => {
-        if (!ex.gifUrl) ex.gifUrl = undefined;
         if (!ex.instructions) ex.instructions = [];
         if (!ex.equipments) ex.equipments = [];
       });
@@ -99,7 +96,7 @@ class MuscloDB extends Dexie {
 
 export const db = new MuscloDB();
 
-const SEED_VERSION = 'free-exercise-db-v1';
+const SEED_VERSION = 'free-exercise-db-v2';
 
 export function needsExerciseDBSeed(): boolean {
   try {
