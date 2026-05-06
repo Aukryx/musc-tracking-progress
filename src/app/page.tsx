@@ -2,31 +2,70 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Dumbbell, Clock, ChevronRight, Zap, Plus } from 'lucide-react';
-import { db, type Workout, type Template, needsExerciseDBSeed, markExerciseDBSeeded } from '@/lib/db';
+import { useRouter } from 'next/navigation';
+import { Settings, Flame, Zap, ArrowRight, Star, ChevronRight } from 'lucide-react';
+import { db, type Template, type Workout, needsExerciseDBSeed, markExerciseDBSeeded } from '@/lib/db';
 import { seedFromExerciseDB } from '@/lib/exercisedb';
-import { formatDate, sessionDuration } from '@/lib/calculations';
+import { sessionDuration } from '@/lib/calculations';
 
-interface WorkoutSummary extends Workout {
-  exerciseCount: number;
-  setCount: number;
+function computeStreak(workouts: Workout[]): number {
+  if (!workouts.length) return 0;
+  const dateKeys = new Set(
+    workouts.map(w => {
+      const d = new Date(w.startedAt);
+      return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+    })
+  );
+  let streak = 0;
+  const cursor = new Date();
+  while (true) {
+    const key = `${cursor.getFullYear()}-${cursor.getMonth()}-${cursor.getDate()}`;
+    if (dateKeys.has(key)) {
+      streak++;
+      cursor.setDate(cursor.getDate() - 1);
+    } else {
+      break;
+    }
+  }
+  return streak;
+}
+
+function sessionsThisWeek(workouts: Workout[]): number {
+  const now = new Date();
+  const monday = new Date(now);
+  monday.setDate(now.getDate() - ((now.getDay() + 6) % 7));
+  monday.setHours(0, 0, 0, 0);
+  return workouts.filter(w => new Date(w.startedAt) >= monday).length;
+}
+
+function formatRelativeDate(date: Date): string {
+  const now = new Date();
+  const diffMs = now.getTime() - new Date(date).getTime();
+  const diffDays = Math.floor(diffMs / 86400000);
+  if (diffDays === 0) return "Aujourd'hui";
+  if (diffDays === 1) return 'Hier';
+  if (diffDays < 7) return `Il y a ${diffDays} jours`;
+  return new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'short' }).format(new Date(date));
+}
+
+function todayLabel(): string {
+  return new Intl.DateTimeFormat('fr-FR', { weekday: 'long', day: 'numeric', month: 'short' }).format(new Date());
 }
 
 export default function DashboardPage() {
-  const [lastWorkout, setLastWorkout] = useState<WorkoutSummary | null>(null);
+  const router = useRouter();
   const [templates, setTemplates] = useState<Template[]>([]);
-  const [stats, setStats] = useState({ totalWorkouts: 0, totalSets: 0 });
+  const [lastWorkout, setLastWorkout] = useState<(Workout & { setCount: number; volume: number }) | null>(null);
+  const [stats, setStats] = useState({ totalWorkouts: 0, totalSets: 0, streak: 0, thisWeek: 0 });
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
-  const [syncProgress, setSyncProgress] = useState({ loaded: 0, total: 873 });
+  const [syncPct, setSyncPct] = useState(0);
 
   useEffect(() => {
     async function init() {
       if (needsExerciseDBSeed()) {
         setSyncing(true);
-        await seedFromExerciseDB((loaded, total) =>
-          setSyncProgress({ loaded, total })
-        );
+        await seedFromExerciseDB((loaded, total) => setSyncPct(Math.round((loaded / total) * 100)));
         markExerciseDBSeeded();
         setSyncing(false);
       }
@@ -34,23 +73,27 @@ export default function DashboardPage() {
     }
 
     async function load() {
-      const [workouts, allSets, tmpl] = await Promise.all([
-        db.workouts.orderBy('startedAt').reverse().limit(1).toArray(),
-        db.workoutSets.count(),
+      const [workouts, tmpl, totalSets] = await Promise.all([
+        db.workouts.orderBy('startedAt').reverse().toArray(),
         db.templates.orderBy('lastUsedAt').reverse().limit(3).toArray(),
+        db.workoutSets.count(),
       ]);
 
-      const totalWorkouts = await db.workouts.count();
+      const streak = computeStreak(workouts);
+      const thisWeek = sessionsThisWeek(workouts);
 
       if (workouts.length > 0) {
         const w = workouts[0];
         const sets = await db.workoutSets.where('workoutId').equals(w.id!).toArray();
-        const exerciseNames = [...new Set(sets.map((s) => s.exerciseName))];
-        setLastWorkout({ ...w, exerciseCount: exerciseNames.length, setCount: sets.length });
+        setLastWorkout({
+          ...w,
+          setCount: sets.length,
+          volume: sets.reduce((a, s) => a + s.weight * s.reps, 0),
+        });
       }
 
       setTemplates(tmpl);
-      setStats({ totalWorkouts, totalSets: allSets });
+      setStats({ totalWorkouts: workouts.length, totalSets, streak, thisWeek });
       setLoading(false);
     }
 
@@ -58,164 +101,180 @@ export default function DashboardPage() {
   }, []);
 
   if (syncing) {
-    const pct = Math.round((syncProgress.loaded / syncProgress.total) * 100);
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-black px-8 gap-6">
-        <div className="text-center">
-          <h2 className="text-white font-bold text-lg mb-1">Syncing exercise library</h2>
-          <p className="text-zinc-500 text-sm">Loading {syncProgress.loaded} / {syncProgress.total} exercises…</p>
+      <div style={{ minHeight: '100dvh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: 'var(--color-bg)', padding: '0 32px', gap: 24 }}>
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ fontSize: 17, fontWeight: 700, marginBottom: 4 }}>Chargement des exercices</div>
+          <div style={{ fontSize: 13, color: 'var(--color-ink-3)' }}>{syncPct}%</div>
         </div>
-        <div className="w-full max-w-xs bg-zinc-900 rounded-full h-2">
-          <div
-            className="bg-blue-500 h-2 rounded-full transition-all duration-300"
-            style={{ width: `${pct}%` }}
-          />
+        <div style={{ width: '100%', maxWidth: 260, height: 4, background: 'var(--color-bg-2)', borderRadius: 999 }}>
+          <div style={{ height: '100%', background: 'var(--color-accent)', borderRadius: 999, width: `${syncPct}%`, transition: 'width 0.3s' }} />
         </div>
-        <p className="text-zinc-600 text-xs">First launch only — data is cached locally</p>
+        <div style={{ fontSize: 11, color: 'var(--color-ink-4)' }}>Premier lancement seulement</div>
       </div>
     );
   }
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-black">
-        <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+      <div style={{ minHeight: '100dvh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--color-bg)' }}>
+        <div style={{ width: 32, height: 32, borderRadius: '50%', border: '2px solid var(--color-accent)', borderTopColor: 'transparent', animation: 'spin 0.8s linear infinite' }} />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-black px-4 py-6 space-y-6">
+    <div style={{ background: 'var(--color-bg)', minHeight: '100dvh', paddingBottom: 110 }} className="no-scrollbar">
+
       {/* Header */}
-      <div className="pt-2">
-        <h1 className="text-2xl font-black text-white tracking-tight">
-          <span className="text-blue-500">Muscle</span>Track
-        </h1>
-        <p className="text-zinc-500 text-sm mt-1">
-          {new Intl.DateTimeFormat('fr-FR', {
-            weekday: 'long',
-            day: 'numeric',
-            month: 'long',
-          }).format(new Date())}
-        </p>
+      <div style={{ padding: '18px 20px 8px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div>
+          <div style={{ fontSize: 13, color: 'var(--color-ink-3)', fontWeight: 500, textTransform: 'capitalize' }}>{todayLabel()}</div>
+          <div style={{ fontSize: 28, fontWeight: 800, letterSpacing: '-0.03em', marginTop: 2 }}>Salut.</div>
+        </div>
+        <button style={{
+          width: 38, height: 38, borderRadius: 12, border: '1px solid var(--color-line)',
+          background: 'transparent', display: 'grid', placeItems: 'center', color: 'var(--color-ink-2)', cursor: 'pointer',
+        }}>
+          <Settings size={18} />
+        </button>
       </div>
 
-      {/* Stats rapides */}
-      <div className="grid grid-cols-2 gap-3">
-        <div className="bg-zinc-950 border border-zinc-800 rounded-2xl p-4">
-          <div className="text-3xl font-black text-white">{stats.totalWorkouts}</div>
-          <div className="text-zinc-500 text-sm mt-1">Séances totales</div>
+      {/* Streak banner */}
+      {stats.streak > 0 && (
+        <div style={{
+          margin: '8px 20px 18px',
+          display: 'flex', gap: 10, alignItems: 'center',
+          background: 'linear-gradient(180deg, rgba(180,255,80,0.1), rgba(180,255,80,0.02))',
+          border: '1px solid rgba(180,255,80,0.2)',
+          borderRadius: 14, padding: '10px 14px',
+        }}>
+          <Flame size={18} color="var(--color-accent)" />
+          <div style={{ fontSize: 13, color: 'var(--color-ink-2)', fontWeight: 500 }}>
+            <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--color-accent)', fontWeight: 700 }}>{stats.streak} jour{stats.streak > 1 ? 's' : ''}</span> de série
+          </div>
+          <div style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--color-ink-3)', fontFamily: 'var(--font-mono)' }}>
+            {stats.thisWeek}/5 cette semaine
+          </div>
         </div>
-        <div className="bg-zinc-950 border border-zinc-800 rounded-2xl p-4">
-          <div className="text-3xl font-black text-blue-400">{stats.totalSets}</div>
-          <div className="text-zinc-500 text-sm mt-1">Séries validées</div>
-        </div>
+      )}
+
+      {/* Section démarrer */}
+      <div style={{ padding: '0 20px' }}>
+        <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--color-ink-3)', marginBottom: 10 }}>Démarrer</div>
+
+        {templates.length > 0 && (
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 10 }}>
+            {templates.map(t => (
+              <button
+                key={t.id}
+                onClick={() => router.push(`/workout?template=${t.id}`)}
+                style={{
+                  background: 'var(--color-bg-1)', border: '1px solid var(--color-line)', borderRadius: 18,
+                  padding: '14px 12px', textAlign: 'left', color: 'var(--color-ink)', cursor: 'pointer',
+                  display: 'flex', flexDirection: 'column', gap: 8,
+                }}
+              >
+                <div style={{
+                  width: 30, height: 30, borderRadius: 9, background: 'var(--color-accent)', color: 'var(--color-accent-ink)',
+                  display: 'grid', placeItems: 'center', fontWeight: 800, fontSize: 14,
+                }}>
+                  {t.name.charAt(0).toUpperCase()}
+                </div>
+                <div>
+                  <div style={{ fontSize: 15, fontWeight: 700, letterSpacing: '-0.01em', lineHeight: 1.2 }}>{t.name}</div>
+                  <div style={{ fontSize: 11, color: 'var(--color-ink-3)', marginTop: 2, fontFamily: 'var(--font-mono)' }}>
+                    {t.exercises.length} ex.
+                  </div>
+                </div>
+              </button>
+            ))}
+          </div>
+        )}
+
+        <button
+          onClick={() => router.push('/workout')}
+          style={{
+            width: '100%', display: 'flex', alignItems: 'center', gap: 14,
+            background: 'var(--color-accent)', color: 'var(--color-accent-ink)', border: 'none',
+            borderRadius: 18, padding: '16px 18px', fontSize: 16, fontWeight: 800, cursor: 'pointer',
+            boxShadow: '0 10px 30px -10px oklch(0.86 0.20 130 / 0.5)',
+          }}
+        >
+          <div style={{ width: 32, height: 32, borderRadius: 10, background: 'rgba(0,0,0,0.18)', display: 'grid', placeItems: 'center' }}>
+            <Zap size={18} />
+          </div>
+          <div style={{ textAlign: 'left' }}>
+            <div>Séance vide</div>
+            <div style={{ fontSize: 12, fontWeight: 500, opacity: 0.7 }}>Tu choisis tes exercices</div>
+          </div>
+          <ArrowRight size={20} style={{ marginLeft: 'auto' }} />
+        </button>
       </div>
 
       {/* Dernière séance */}
-      {lastWorkout ? (
-        <div className="bg-zinc-950 border border-zinc-800 rounded-2xl p-4">
-          <div className="flex items-center justify-between mb-3">
-            <span className="text-xs text-zinc-500 uppercase tracking-widest font-semibold">
-              Dernière séance
-            </span>
-            <Link
-              href={`/history/${lastWorkout.id}`}
-              className="text-blue-400 text-xs flex items-center gap-1"
-            >
-              Voir <ChevronRight size={12} />
-            </Link>
-          </div>
-          <h2 className="text-white font-bold text-lg">{lastWorkout.name}</h2>
-          <div className="flex items-center gap-4 mt-2 text-sm text-zinc-400">
-            <span className="flex items-center gap-1.5">
-              <Clock size={13} />
-              {formatDate(lastWorkout.startedAt)}
-            </span>
-          </div>
-          <div className="flex gap-4 mt-3 pt-3 border-t border-zinc-800">
-            <div>
-              <span className="text-white font-bold">{lastWorkout.exerciseCount}</span>
-              <span className="text-zinc-500 text-sm ml-1">exercices</span>
-            </div>
-            <div>
-              <span className="text-white font-bold">{lastWorkout.setCount}</span>
-              <span className="text-zinc-500 text-sm ml-1">séries</span>
-            </div>
-            {lastWorkout.finishedAt && (
+      <div style={{ padding: '20px 20px 0' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+          <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--color-ink-3)' }}>Dernière séance</div>
+          <Link href="/progress" style={{
+            color: 'var(--color-ink-3)', fontSize: 12, fontWeight: 600,
+            display: 'flex', alignItems: 'center', gap: 2, textDecoration: 'none',
+          }}>Tout voir <ChevronRight size={12} /></Link>
+        </div>
+
+        {lastWorkout ? (
+          <div style={{ background: 'var(--color-bg-1)', border: '1px solid var(--color-line)', borderRadius: 20, padding: 16 }}>
+            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
               <div>
-                <span className="text-white font-bold">
-                  {sessionDuration(lastWorkout.startedAt, lastWorkout.finishedAt)}
-                </span>
-                <span className="text-zinc-500 text-sm ml-1">min</span>
+                <div style={{ fontSize: 18, fontWeight: 800, letterSpacing: '-0.02em' }}>{lastWorkout.name}</div>
+                <div style={{ fontSize: 12, color: 'var(--color-ink-3)', marginTop: 2 }}>{formatRelativeDate(lastWorkout.startedAt)}</div>
               </div>
-            )}
-          </div>
-        </div>
-      ) : (
-        <div className="bg-zinc-950 border border-zinc-800 rounded-2xl p-6 text-center">
-          <Dumbbell size={32} className="mx-auto text-zinc-700 mb-3" />
-          <p className="text-zinc-400">Pas encore de séance</p>
-          <p className="text-zinc-600 text-sm mt-1">Commencez votre première séance !</p>
-        </div>
-      )}
-
-      {/* Action principale */}
-      <Link
-        href="/workout"
-        className="flex items-center gap-4 bg-blue-600 hover:bg-blue-500 active:scale-[0.98] text-white p-5 rounded-2xl font-bold text-lg transition-all touch-manipulation"
-      >
-        <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center">
-          <Zap size={20} />
-        </div>
-        <div>
-          <div>Démarrer une séance</div>
-          <div className="text-blue-200 text-sm font-normal">Séance vide</div>
-        </div>
-        <ChevronRight size={20} className="ml-auto" />
-      </Link>
-
-      {/* Templates */}
-      {templates.length > 0 && (
-        <div>
-          <div className="flex items-center justify-between mb-3">
-            <span className="text-xs text-zinc-500 uppercase tracking-widest font-semibold">
-              Templates
-            </span>
-            <Link href="/templates" className="text-blue-400 text-xs flex items-center gap-1">
-              Tous <ChevronRight size={12} />
-            </Link>
-          </div>
-          <div className="space-y-2">
-            {templates.map((t) => (
-              <Link
-                key={t.id}
-                href={`/workout?template=${t.id}`}
-                className="flex items-center gap-3 bg-zinc-950 border border-zinc-800 hover:border-zinc-600 active:scale-[0.98] rounded-xl p-4 transition-all touch-manipulation"
-              >
-                <div className="w-9 h-9 rounded-lg bg-zinc-800 flex items-center justify-center">
-                  <Dumbbell size={16} className="text-zinc-400" />
+            </div>
+            <div style={{ display: 'flex', gap: 16, marginTop: 14, paddingTop: 12, borderTop: '1px solid var(--color-line)' }}>
+              {lastWorkout.finishedAt && (
+                <div>
+                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: 18, fontWeight: 700 }}>
+                    {sessionDuration(lastWorkout.startedAt, lastWorkout.finishedAt as Date)}
+                    <span style={{ fontSize: 11, color: 'var(--color-ink-3)', marginLeft: 2 }}>min</span>
+                  </div>
+                  <div style={{ fontSize: 10, color: 'var(--color-ink-3)', marginTop: 2 }}>Durée</div>
                 </div>
-                <div className="flex-1 min-w-0">
-                  <div className="text-white font-medium truncate">{t.name}</div>
-                  <div className="text-zinc-500 text-xs">{t.exercises.length} exercices</div>
+              )}
+              <div>
+                <div style={{ fontFamily: 'var(--font-mono)', fontSize: 18, fontWeight: 700 }}>{lastWorkout.setCount}</div>
+                <div style={{ fontSize: 10, color: 'var(--color-ink-3)', marginTop: 2 }}>Séries</div>
+              </div>
+              <div>
+                <div style={{ fontFamily: 'var(--font-mono)', fontSize: 18, fontWeight: 700 }}>
+                  {(lastWorkout.volume / 1000).toFixed(1)}
+                  <span style={{ fontSize: 11, color: 'var(--color-ink-3)', marginLeft: 2 }}>t</span>
                 </div>
-                <ChevronRight size={16} className="text-zinc-600" />
-              </Link>
-            ))}
+                <div style={{ fontSize: 10, color: 'var(--color-ink-3)', marginTop: 2 }}>Volume</div>
+              </div>
+            </div>
           </div>
-        </div>
-      )}
+        ) : (
+          <div style={{ background: 'var(--color-bg-1)', border: '1px solid var(--color-line)', borderRadius: 20, padding: '32px 16px', textAlign: 'center' }}>
+            <div style={{ fontSize: 13, color: 'var(--color-ink-4)' }}>Aucune séance pour l&apos;instant</div>
+          </div>
+        )}
+      </div>
 
-      {templates.length === 0 && (
-        <Link
-          href="/templates"
-          className="flex items-center gap-3 border border-dashed border-zinc-800 hover:border-zinc-600 rounded-xl p-4 transition-colors"
-        >
-          <Plus size={18} className="text-zinc-600" />
-          <span className="text-zinc-500 text-sm">Créer un template de séance</span>
-        </Link>
-      )}
+      {/* Stats globales */}
+      <div style={{ padding: '18px 20px 0', display: 'flex', gap: 8 }}>
+        <div style={{ background: 'var(--color-bg-1)', border: '1px solid var(--color-line)', borderRadius: 18, padding: 14, flex: 1 }}>
+          <div style={{ fontFamily: 'var(--font-mono)', fontSize: 28, fontWeight: 800, lineHeight: 1, letterSpacing: '-0.02em' }}>
+            {stats.totalWorkouts}
+          </div>
+          <div style={{ fontSize: 12, color: 'var(--color-ink-3)', marginTop: 6, fontWeight: 500 }}>Séances</div>
+        </div>
+        <div style={{ background: 'var(--color-bg-1)', border: '1px solid var(--color-line)', borderRadius: 18, padding: 14, flex: 1 }}>
+          <div style={{ fontFamily: 'var(--font-mono)', fontSize: 28, fontWeight: 800, lineHeight: 1, letterSpacing: '-0.02em', color: 'var(--color-accent)' }}>
+            {stats.totalSets}
+          </div>
+          <div style={{ fontSize: 12, color: 'var(--color-ink-3)', marginTop: 6, fontWeight: 500 }}>Séries</div>
+        </div>
+      </div>
     </div>
   );
 }

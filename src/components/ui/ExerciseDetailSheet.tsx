@@ -1,9 +1,10 @@
 'use client';
 
-import { X } from 'lucide-react';
 import Image from 'next/image';
-import MuscleMap, { MuscleLegend } from './MuscleMap';
-import type { Exercise } from '@/lib/db';
+import { ArrowLeft, Star } from 'lucide-react';
+import { db, type Exercise } from '@/lib/db';
+import { useEffect, useState } from 'react';
+import { calculate1RM } from '@/lib/calculations';
 
 interface ExerciseDetailSheetProps {
   exercise: Exercise;
@@ -11,120 +12,155 @@ interface ExerciseDetailSheetProps {
   onSelect?: () => void;
 }
 
+interface PersonalBest {
+  weight: number;
+  reps: number;
+  oneRepMax: number;
+  daysAgo: number;
+}
+
 function capitalize(s: string) {
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
 export default function ExerciseDetailSheet({ exercise, onClose, onSelect }: ExerciseDetailSheetProps) {
-  const hasMuscles = exercise.primaryMuscles.length > 0 || exercise.secondaryMuscles.length > 0;
+  const [personalBest, setPersonalBest] = useState<PersonalBest | null>(null);
+
+  useEffect(() => {
+    db.workoutSets.where('exerciseName').equals(exercise.name).toArray().then(sets => {
+      if (!sets.length) return;
+      const best = sets.reduce((a, b) => a.oneRepMax >= b.oneRepMax ? a : b);
+      const daysAgo = Math.floor((Date.now() - new Date(best.completedAt).getTime()) / 86400000);
+      setPersonalBest({ weight: best.weight, reps: best.reps, oneRepMax: best.oneRepMax, daysAgo });
+    });
+  }, [exercise.name]);
+
+  const primaryMuscles = exercise.primaryMuscles ?? [];
+  const secondaryMuscles = exercise.secondaryMuscles ?? [];
+  const allMuscles = [...primaryMuscles, ...secondaryMuscles];
+  const instructions = exercise.instructions ?? [];
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-zinc-950">
+    <div style={{ position: 'fixed', inset: 0, zIndex: 50, display: 'flex', flexDirection: 'column', background: 'var(--color-bg)' }}>
       {/* Header */}
-      <div className="flex items-center gap-3 px-4 py-4 border-b border-zinc-800 shrink-0">
-        <button onClick={onClose} className="text-zinc-400 hover:text-white transition-colors">
-          <X size={22} />
+      <div style={{ padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 12, borderBottom: '1px solid var(--color-line)', flexShrink: 0 }}>
+        <button onClick={onClose} style={{
+          width: 36, height: 36, borderRadius: 10, background: 'var(--color-bg-2)', border: '1px solid var(--color-line)',
+          display: 'grid', placeItems: 'center', color: 'var(--color-ink-2)', cursor: 'pointer',
+        }}>
+          <ArrowLeft size={16} />
         </button>
-        <div className="flex-1 min-w-0">
-          <h2 className="text-white font-bold text-lg truncate">{exercise.name}</h2>
-          <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-            <span className="text-xs text-zinc-400 bg-zinc-800 px-2 py-0.5 rounded-full">
-              {exercise.muscleGroup}
-            </span>
-            <span className="text-xs text-zinc-500 bg-zinc-900 px-2 py-0.5 rounded-full">
-              {exercise.category}
-            </span>
-            {exercise.equipments?.map((eq) => (
-              <span key={eq} className="text-xs text-zinc-600 bg-zinc-900 px-2 py-0.5 rounded-full">
-                {capitalize(eq)}
-              </span>
-            ))}
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 15, fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{exercise.name}</div>
+          <div style={{ fontSize: 11, color: 'var(--color-ink-3)', marginTop: 1 }}>
+            {primaryMuscles.slice(0, 2).map(capitalize).join(', ')}
+            {exercise.equipments?.length ? ` · ${capitalize(exercise.equipments[0])}` : ''}
           </div>
         </div>
       </div>
 
-      {/* Scrollable content */}
-      <div className="flex-1 overflow-y-auto">
-
+      {/* Content */}
+      <div style={{ flex: 1, overflowY: 'auto', paddingBottom: onSelect ? 80 : 20 }} className="no-scrollbar">
         {/* GIF */}
-        {exercise.gifUrl && (
-          <div className="flex justify-center items-center bg-zinc-900 py-6 px-4">
+        {exercise.gifUrl ? (
+          <div style={{ margin: 16 }}>
             <Image
               src={exercise.gifUrl}
               alt={exercise.name}
-              width={208}
-              height={208}
-              className="h-52 rounded-2xl object-contain"
+              width={361}
+              height={200}
+              style={{ width: '100%', height: 200, objectFit: 'cover', borderRadius: 18, background: 'var(--color-bg-2)' }}
             />
+          </div>
+        ) : (
+          <div style={{
+            margin: 16, height: 200, borderRadius: 18,
+            background: `repeating-linear-gradient(135deg, var(--color-bg-1) 0 12px, var(--color-bg-2) 12px 24px)`,
+            border: '1px solid var(--color-line)', display: 'grid', placeItems: 'center',
+            color: 'var(--color-ink-3)', fontSize: 12, fontFamily: 'var(--font-mono)',
+          }}>
+            [Démonstration]
           </div>
         )}
 
-        {/* Muscle map */}
-        {hasMuscles && (
-          <div className="px-4 pt-5 pb-4">
-            <p className="text-xs text-zinc-500 uppercase tracking-widest font-semibold mb-4">
-              Muscles
-            </p>
-            <div className="flex flex-col items-center gap-3">
-              <MuscleMap primary={exercise.primaryMuscles} secondary={exercise.secondaryMuscles} size={220} />
-              <MuscleLegend />
+        {/* Personal best */}
+        {personalBest && (
+          <div style={{ padding: '0 16px 0' }}>
+            <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--color-ink-3)', marginBottom: 8 }}>Ton record</div>
+            <div style={{
+              background: 'var(--color-bg-1)', border: '1px solid var(--color-line)', borderRadius: 16,
+              padding: 16, display: 'flex', alignItems: 'center', gap: 16,
+            }}>
+              <div style={{
+                width: 48, height: 48, borderRadius: 14, background: 'var(--color-accent-soft)',
+                display: 'grid', placeItems: 'center', flexShrink: 0,
+              }}>
+                <Star size={22} color="var(--color-accent)" fill="var(--color-accent)" />
+              </div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontFamily: 'var(--font-mono)', fontSize: 22, fontWeight: 800, letterSpacing: '-0.02em' }}>
+                  {personalBest.weight}<span style={{ fontSize: 13, color: 'var(--color-ink-3)', marginLeft: 2 }}>kg</span>
+                  <span style={{ color: 'var(--color-ink-3)', margin: '0 6px' }}>×</span>
+                  {personalBest.reps}
+                </div>
+                <div style={{ fontSize: 11, color: 'var(--color-ink-3)', marginTop: 2 }}>
+                  1RM estimé · {personalBest.oneRepMax.toFixed(1)}kg
+                  {personalBest.daysAgo === 0 ? " · Aujourd'hui" : personalBest.daysAgo === 1 ? ' · Hier' : ` · Il y a ${personalBest.daysAgo} jours`}
+                </div>
+              </div>
             </div>
-            <div className="mt-4 space-y-2">
-              {exercise.primaryMuscles.length > 0 && (
-                <div className="flex flex-wrap gap-1.5">
-                  {exercise.primaryMuscles.map((m) => (
-                    <span key={m} className="text-xs bg-blue-600/20 text-blue-400 border border-blue-600/30 px-2.5 py-1 rounded-full">
-                      {capitalize(m)}
-                    </span>
-                  ))}
-                </div>
-              )}
-              {exercise.secondaryMuscles.length > 0 && (
-                <div className="flex flex-wrap gap-1.5">
-                  {exercise.secondaryMuscles.map((m) => (
-                    <span key={m} className="text-xs bg-zinc-800 text-zinc-400 border border-zinc-700 px-2.5 py-1 rounded-full">
-                      {capitalize(m)}
-                    </span>
-                  ))}
-                </div>
-              )}
+          </div>
+        )}
+
+        {/* Muscles */}
+        {allMuscles.length > 0 && (
+          <div style={{ padding: '20px 16px 0' }}>
+            <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--color-ink-3)', marginBottom: 10 }}>Muscles ciblés</div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+              {primaryMuscles.map(m => (
+                <span key={m} style={{
+                  padding: '6px 12px', borderRadius: 999, fontSize: 12, fontWeight: 600,
+                  background: 'var(--color-accent-soft)', color: 'var(--color-accent)',
+                }}>{capitalize(m)}</span>
+              ))}
+              {secondaryMuscles.map(m => (
+                <span key={m} style={{
+                  padding: '6px 12px', borderRadius: 999, fontSize: 12, fontWeight: 600,
+                  background: 'var(--color-bg-1)', color: 'var(--color-ink-2)', border: '1px solid var(--color-line)',
+                }}>{capitalize(m)}</span>
+              ))}
             </div>
           </div>
         )}
 
         {/* Instructions */}
-        {(exercise.instructions?.length ?? 0) > 0 && (
-          <>
-            <div className="h-px bg-zinc-900 mx-4" />
-            <div className="px-4 py-5">
-              <p className="text-xs text-zinc-500 uppercase tracking-widest font-semibold mb-4">
-                Instructions
-              </p>
-              <ol className="space-y-3">
-                {(exercise.instructions ?? []).map((step, i) => (
-                  <li key={i} className="flex items-start gap-3">
-                    <span className="text-xs text-blue-400 font-bold bg-blue-600/20 rounded-full w-5 h-5 flex items-center justify-center shrink-0 mt-0.5">
-                      {i + 1}
-                    </span>
-                    <span className="text-zinc-300 text-sm leading-snug">{step}</span>
-                  </li>
-                ))}
-              </ol>
-            </div>
-          </>
+        {instructions.length > 0 && (
+          <div style={{ padding: '20px 16px 0' }}>
+            <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--color-ink-3)', marginBottom: 10 }}>Exécution</div>
+            <ol style={{ margin: 0, padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 2 }}>
+              {instructions.map((step, i) => (
+                <li key={i} style={{ display: 'flex', gap: 10, alignItems: 'flex-start', padding: '8px 0' }}>
+                  <span style={{
+                    fontFamily: 'var(--font-mono)', width: 22, height: 22, borderRadius: 999,
+                    background: 'var(--color-bg-2)', color: 'var(--color-ink-2)',
+                    display: 'grid', placeItems: 'center', fontSize: 11, fontWeight: 700, flexShrink: 0,
+                  }}>{i + 1}</span>
+                  <span style={{ fontSize: 13, color: 'var(--color-ink-2)', lineHeight: 1.45 }}>{step}</span>
+                </li>
+              ))}
+            </ol>
+          </div>
         )}
-
-        <div className="h-6" />
       </div>
 
-      {/* Add to workout button */}
+      {/* Add to workout */}
       {onSelect && (
-        <div className="px-4 py-4 border-t border-zinc-800 shrink-0">
-          <button
-            onClick={onSelect}
-            className="w-full bg-blue-600 hover:bg-blue-500 text-white py-4 rounded-2xl font-bold text-base transition-colors active:scale-[0.98] touch-manipulation"
-          >
-            Add to workout
+        <div style={{ padding: '12px 16px', borderTop: '1px solid var(--color-line)', flexShrink: 0 }}>
+          <button onClick={onSelect} style={{
+            width: '100%', background: 'var(--color-accent)', color: 'var(--color-accent-ink)',
+            border: 'none', borderRadius: 16, padding: '16px', fontSize: 15, fontWeight: 700, cursor: 'pointer',
+          }}>
+            Ajouter à la séance
           </button>
         </div>
       )}

@@ -4,7 +4,6 @@ const withPWA = require('@ducanh2912/next-pwa').default({
   cacheOnFrontEndNav: true,
   aggressiveFrontEndNavCaching: true,
   reloadOnOnline: true,
-  // Désactivé en dev pour éviter les problèmes de cache
   disable: process.env.NODE_ENV === 'development',
   workboxOptions: {
     disableDevLogs: true,
@@ -13,16 +12,18 @@ const withPWA = require('@ducanh2912/next-pwa').default({
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // Turbopack utilisé en dev, webpack en prod (pour next-pwa)
-  // turbopack: {} évite l'erreur "webpack config sans turbopack config"
   turbopack: {},
+  async redirects() {
+    return [
+      { source: '/analytics', destination: '/progress', permanent: false },
+      { source: '/history', destination: '/progress', permanent: false },
+    ];
+  },
   async headers() {
     return [
       {
         source: '/manifest.json',
-        headers: [
-          { key: 'Content-Type', value: 'application/manifest+json' },
-        ],
+        headers: [{ key: 'Content-Type', value: 'application/manifest+json' }],
       },
     ];
   },

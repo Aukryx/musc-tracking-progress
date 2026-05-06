@@ -56,11 +56,58 @@ export interface Template {
   lastUsedAt?: Date;
 }
 
+// ── Nutrition ──────────────────────────────────────────────────────────────────
+
+export interface Food {
+  id?: number;
+  name: string;
+  kcalPer100: number;
+  protein: number;
+  carbs: number;
+  fats: number;
+  fibers: number;
+}
+
+export interface MealItem {
+  foodId: number;
+  qty: number;
+}
+
+export interface Meal {
+  id?: number;
+  date: string;
+  time: string;
+  name: string;
+  items: MealItem[];
+  done: boolean;
+}
+
+export interface NutritionGoal {
+  id?: number;
+  kcal: number;
+  proteinG: number;
+  carbsG: number;
+  fatsG: number;
+  fibersG: number;
+}
+
+export interface WaterLog {
+  id?: number;
+  date: string;
+  doses: number;
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+
 class MuscloDB extends Dexie {
   exercises!: Table<Exercise>;
   workouts!: Table<Workout>;
   workoutSets!: Table<WorkoutSet>;
   templates!: Table<Template>;
+  foods!: Table<Food>;
+  meals!: Table<Meal>;
+  nutritionGoals!: Table<NutritionGoal>;
+  waterLogs!: Table<WaterLog>;
 
   constructor() {
     super('MuscloDB');
@@ -90,6 +137,17 @@ class MuscloDB extends Dexie {
         if (!ex.instructions) ex.instructions = [];
         if (!ex.equipments) ex.equipments = [];
       });
+    });
+
+    this.version(4).stores({
+      exercises: '++id, name, category, muscleGroup',
+      workouts: '++id, startedAt, finishedAt, templateId',
+      workoutSets: '++id, workoutId, exerciseName, exerciseOrder, completedAt',
+      templates: '++id, name, createdAt, lastUsedAt',
+      foods: '++id, name',
+      meals: '++id, date, name',
+      nutritionGoals: '++id',
+      waterLogs: '++id, date',
     });
   }
 }

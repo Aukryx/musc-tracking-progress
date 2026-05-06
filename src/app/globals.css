@@ -1,13 +1,54 @@
 @import "tailwindcss";
 
-:root {
-  --background: #000000;
-  --foreground: #ffffff;
+@theme {
+  /* Backgrounds — dark OLED */
+  --color-bg:    #0a0a0b;
+  --color-bg-1:  #111114;
+  --color-bg-2:  #17171b;
+  --color-bg-3:  #1f1f24;
+
+  /* Lines */
+  --color-line:   #26262c;
+  --color-line-2: #34343c;
+
+  /* Ink (text) */
+  --color-ink:   #f5f5f7;
+  --color-ink-2: #c1c1c8;
+  --color-ink-3: #7a7a82;
+  --color-ink-4: #4a4a52;
+
+  /* Brand */
+  --color-accent:      oklch(0.86 0.20 130);
+  --color-accent-soft: oklch(0.86 0.20 130 / 0.14);
+  --color-accent-ink:  #0a0a0b;
+
+  /* Semantic */
+  --color-pr:   oklch(0.86 0.20 90);
+  --color-warn: oklch(0.78 0.18 60);
+  --color-bad:  oklch(0.68 0.22 25);
+
+  /* Macro hues */
+  --color-macro-protein: oklch(0.78 0.16 130);
+  --color-macro-carbs:   oklch(0.78 0.16 75);
+  --color-macro-fats:    oklch(0.78 0.16 40);
+
+  /* Type */
+  --font-display: "Inter Tight", -apple-system, system-ui, sans-serif;
+  --font-mono:    "JetBrains Mono", ui-monospace, monospace;
+
+  /* Radii */
+  --radius-sm: 10px;
+  --radius-md: 12px;
+  --radius-lg: 14px;
+  --radius-xl: 18px;
+  --radius-2xl: 22px;
+  --radius-pill: 999px;
 }
 
 body {
-  background: #000000;
-  color: #ffffff;
+  background: var(--color-bg);
+  color: var(--color-ink);
+  font-family: var(--font-display);
   -webkit-tap-highlight-color: transparent;
   -webkit-touch-callout: none;
 }
@@ -22,19 +63,27 @@ input[type='number'] {
   -moz-appearance: textfield;
 }
 
-/* Scrollbar discrète */
-::-webkit-scrollbar {
-  width: 4px;
+/* Scrollbar invisible */
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }
-::-webkit-scrollbar-track {
-  background: transparent;
-}
-::-webkit-scrollbar-thumb {
-  background: #3f3f46;
-  border-radius: 2px;
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
 }
 
-/* Touch actions */
-.touch-manipulation {
-  touch-action: manipulation;
+/* Skeleton shimmer */
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+.skeleton {
+  background: linear-gradient(90deg, var(--color-bg-1) 25%, var(--color-bg-2) 50%, var(--color-bg-1) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+}
+
+/* Font tnum */
+.tnum {
+  font-feature-settings: 'tnum' 1;
 }
